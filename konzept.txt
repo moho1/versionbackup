@@ -1,0 +1,48 @@
+Client:
+ Stündliches einlesen:
+  Dateien rekursiv mit Hash in die Datenbank
+  Ordner rekursiv in die Datenbank
+
+ Nach einlesen:
+  Server kontaktieren
+  Datenbank Senden
+  auf angeforderte Dateien warten
+  Angeforderte Dateien senden
+
+Server:
+ bei Verbindungsaufnahme durch Client:
+  Datenbank anfordern/empfangen
+  empfangene Datenbank in den DB-Server einlesen:
+   für jeden Eintrag in SQlite:
+    Datei:
+     Wenn nicht in der Server-Datenbank:
+      Zusätzlich: Generischer Dateiname (Checksum) + Checksum + im Dateisystem=Nein in den DB-Server (Dateitabelle)
+     Dateiname + Pfad + Checksum + Rechte in Backup-Tabelle
+    Ordner:
+     Eintrag in Backup-Tabelle (s.o.)
+  Noch nicht existente Dateien:
+   Anfordern vom Client
+   Empfangen
+   Wenn Backup-Medium existent auf das Medium
+    sonst in den Cache
+   im Dateisystem=Ja in den DB-Server
+  DB-Dump in den Cache/Backup-Medium
+
+ bei anschließen des Backupmediums:
+  Wenn der Cache gefüllt ist:
+   Inhalt des Caches kopieren
+
+Protokoll:
+ Server: listen
+ Client: connect
+ Server: fertig zum empfangen
+ Client: sende DB
+ <Server: lese DB ein (s.o.)>
+ Server: fordere Datei an:
+ >file /path/to/file
+ Client: sende Datei
+ .
+ .
+ .
+ Server: Verbindung beenden
+ Client: Verbindung beenden
