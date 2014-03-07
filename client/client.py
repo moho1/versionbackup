@@ -8,7 +8,7 @@ import hashlib
 import sqlite3
 import socket
 
-Fail=False
+fail=False
 
 def index(path, tmpdb):
     """The sha512 hashs are being calculated and inserted into the database
@@ -19,8 +19,8 @@ def index(path, tmpdb):
     c.execute("drop table if exists files")
     c.execute("drop table if exists dirs")
 
-    c.execute("create table files (sum text, filename text)")
-    c.execute("create table dirs (dirname text)")
+    c.execute("create table files (sum text, filename text, mode integer, uid integer, gid integer, mtime integer )")
+    c.execute("create table dirs ( dirname text, mode integer, uid integer, gid integer, mtime integer )")
 
     for root, dirs, files in os.walk(path):
         for name in files:
@@ -29,11 +29,16 @@ def index(path, tmpdb):
                 data = open(filename, "r")
                 print(filename)
                 filehash = hashlib.sha512(data.read()).hexdigest()
+                statobj = os.stat(filename)
+                mode = statobj.st_mode
+                uid = statobj.st_uid
+                gid = statobj.st_gid
+                mtime = statobj.st_mtime
 
             except IOError:
 #               print("IOError")
                 sys.__stderr__.write("IOError in file " + filename + "\n")
-                Fail=True
+                fail=True
                 continue
 
             except MemoryError:
@@ -41,13 +46,18 @@ def index(path, tmpdb):
                 sys.__stderr__.write("MemoryError in file " + filename + "\n")
                 fail=True
                 continue
-
-            c.execute("insert into files values ( ?, ? )", (filehash, buffer(filename)))
+            
+            c.execute("insert into files values ( ?, ?, ?, ?, ?, ? )", (filehash, buffer(filename), mode, uid, gid, mtime))
             data.close()
 
         for name in dirs:
             dirname = root + "/" + name
-            c.execute("insert into dirs values ( ? )", [buffer(dirname)])
+            statobj = os.stat(dirname)
+            mode = statobj.st_mode
+            uid = statobj.st_uid
+            gid = statobj.st_gid
+            mtime = statobj.st_mtime
+            c.execute("insert into dirs values ( ?, ?, ?, ?, ? )", (buffer(dirname), mode, uid, gid, mtime))
     conn.commit()
     conn.close()
 
@@ -79,9 +89,9 @@ def connectioncleanup(s):
 if __name__ == "__main__":
     tmpdb = "tmp.db"
     index(sys.argv[1], tmpdb)
-    s = connectToServer()
-    senddata(s, tmpdb)
-    connectioncleanup(s)
+#    s = connectToServer()
+#    senddata(s, tmpdb)
+#    connectioncleanup(s)
 
 
     if fail:
