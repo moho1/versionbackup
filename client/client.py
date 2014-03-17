@@ -1,5 +1,4 @@
-#!/usr/bin/python2
-# -*- coding: iso-8859-1 -*-
+#!/usr/bin/python
 # Author: Moritz Holtz
 
 import os
@@ -7,8 +6,16 @@ import sys
 import hashlib
 import sqlite3
 import socket
+import functools
 
 fail=False
+
+def sha512sum(filename):
+    with open(filename, mode='rb') as f:
+        d = hashlib.sha512()
+        for buf in iter(functools.partial(f.read, 4096), b''):
+            d.update(buf)
+    return d.hexdigest()
 
 def index(path, tmpdb):
     """The sha512 hashs are being calculated and inserted into the database
@@ -26,9 +33,8 @@ def index(path, tmpdb):
         for name in files:
             filename = root + "/" + name
             try:
-                data = open(filename, "r")
                 print(filename)
-                filehash = hashlib.sha512(data.read()).hexdigest()
+                filehash = sha512sum(filename)
                 statobj = os.stat(filename)
                 mode = statobj.st_mode
                 uid = statobj.st_uid
@@ -47,8 +53,7 @@ def index(path, tmpdb):
                 fail=True
                 continue
             
-            c.execute("insert into files values ( ?, ?, ?, ?, ?, ? )", (filehash, buffer(filename), mode, uid, gid, mtime))
-            data.close()
+            c.execute("insert into files values ( ?, ?, ?, ?, ?, ? )", (filehash, filename, mode, uid, gid, mtime))
 
         for name in dirs:
             dirname = root + "/" + name
@@ -57,7 +62,7 @@ def index(path, tmpdb):
             uid = statobj.st_uid
             gid = statobj.st_gid
             mtime = statobj.st_mtime
-            c.execute("insert into dirs values ( ?, ?, ?, ?, ? )", (buffer(dirname), mode, uid, gid, mtime))
+            c.execute("insert into dirs values ( ?, ?, ?, ?, ? )", (dirname, mode, uid, gid, mtime))
     conn.commit()
     conn.close()
 
