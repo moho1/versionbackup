@@ -10,102 +10,91 @@ import functools
 
 fail=False
 
-class Index:
-	
-	dbconn = None
-	dbcursor = None
-	path = ""
+def sha512sum(filename):
+    with open(filename, mode='rb') as f:
+        d = hashlib.sha512()
+        for buf in iter(functools.partial(f.read, 4096), b''):
+            d.update(buf)
+    return d.hexdigest()
 
-	def __init__(self, path, dbconn):
-		self.dbconn = dbconn
-		self.path = path
-		self.dbinit()
+def dbinit(dbconn):
+    c = dbconn.cursor()
+    
+    c.execute("drop table if exists files")
+    c.execute("drop table if exists dirs")
 
-	def __destroy__(self):
-		self.dbclose()
+    c.execute("create table files (sum text, filename text, mode integer, uid integer, gid integer, mtime integer )")
+    c.execute("create table dirs ( dirname text, mode integer, uid integer, gid integer, mtime integer )")
 
-	def sha512sum(self, filename):
-		with open(filename, mode='rb') as f:
-			d = hashlib.sha512()
-			for buf in iter(functools.partial(f.read, 4096), b''):
-				d.update(buf)
-		return d.hexdigest()
+    dbconn.commit()
+    c.close()
 
-	def dbinit(self):
-		self.dbcursor = self.dbconn.cursor()
-		
-		self.dbcursor.execute("drop table if exists files")
-		self.dbcursor.execute("drop table if exists dirs")
+def getmeta(filename):
+    statobj = os.stat(filename)
+    mode = statobj.st_mode
+    uid = statobj.st_uid
+    gid = statobj.st_gid
+    mtime = statobj.st_mtime
+    return (mode, uid, gid, mtime)
 
-		self.dbcursor.execute("create table files (sum text, filename text, mode integer, uid integer, gid integer, mtime integer )")
-		self.dbcursor.execute("create table dirs ( dirname text, mode integer, uid integer, gid integer, mtime integer )")
+def index(path, dbconn):
+    c = dbconn.cursor()
+    for root, dirs, files in os.walk(path):
+        for name in files:
+            filename = root + "/" + name
+            print("File:", filename)
+            filehash = sha512sum(filename)
+            (mode, uid, gid, mtime) = getmeta(filename)
+            c.execute("insert into files values ( ?, ?, ?, ?, ?, ? )", (filehash, filename, mode, uid, gid, mtime))
 
-	def getmeta(self, filename):
-		statobj = os.stat(filename)
-		mode = statobj.st_mode
-		uid = statobj.st_uid
-		gid = statobj.st_gid
-		mtime = statobj.st_mtime
-		return (mode, uid, gid, mtime)
-
-	def index(self):
-		for root, dirs, files in os.walk(self.path):
-			for name in files:
-				filename = root + "/" + name
-				print("File:", filename)
-				filehash = self.sha512sum(filename)
-				(mode, uid, gid, mtime) = self.getmeta(filename)
-				self.dbcursor.execute("insert into files values ( ?, ?, ?, ?, ?, ? )", (filehash, filename, mode, uid, gid, mtime))
-
-			for name in dirs:
-				dirname = root + "/" + name
-				print("Dir:", dirname)
-				(mode, uid, gid, mtime) = self.getmeta(dirname)
-				self.dbcursor.execute("insert into dirs values ( ?, ?, ?, ?, ? )", (dirname, mode, uid, gid, mtime))
-		self.dbconn.commit()
-	
-	def dbclose(self):
-		self.dbconn.close()
-
-def connectToServer(ip, port, ipIsSocket=False):
-	sockettype = socket.AF_INET
-	if ipIsSocket: sockettype = socket.AF_UNIX
-	s = socket.socket(sockettype, socket.SOCK_STREAM)
-	s.connect((ip, port))
-	return s
-
-def senddata(s, db):
-	dbdata = open(db,"r")
-	s.sendall(dbdata.read())
-	dbdata.close()
-	while True:
-		filename = ""
-		while True:
-			tmp = s.recv(1024)
-			if not data: break
-			filename += tmp
-		if filename == "EOF": break
-		pointer = open(filename, "r")
-		s.sendall(pointer.read())
-		pointer.close()
-
-def connectioncleanup(s):
-	s.close()
+        for name in dirs:
+            dirname = root + "/" + name
+            print("Dir:", dirname)
+            (mode, uid, gid, mtime) = getmeta(dirname)
+            c.execute("insert into dirs values ( ?, ?, ?, ?, ? )", (dirname, mode, uid, gid, mtime))
+    dbconn.commit()
+    c.close()
+    
+#def connectToServer(ip, port, ipIsSocket=False):
+#    sockettype = socket.AF_INET
+#    if ipIsSocket: sockettype = socket.AF_UNIX
+#    s = socket.socket(sockettype, socket.SOCK_STREAM)
+#    s.connect((ip, port))
+#    return s
+#
+#def senddata(s, db):
+#    dbdata = open(db,"r")
+#    s.sendall(dbdata.read())
+#    dbdata.close()
+#    while True:
+#        filename = ""
+#        while True:
+#            tmp = s.recv(1024)
+#            if not data: break
+#            filename += tmp
+#        if filename == "EOF": break
+#        pointer = open(filename, "r")
+#        s.sendall(pointer.read())
+#        pointer.close()
+#
+#def connectioncleanup(s):
+#    s.close()
 
 if __name__ == "__main__":
-	conn = sqlite3.connect("tmp.db")
-	indexobj = Index(sys.argv[1], conn)
-	indexobj.index()
+    conn = sqlite3.connect("tmp.db")
+    dbinit(conn)
+    index(sys.argv[1], conn)
+    conn.close()
 
 
-#	tmpdb = "tmp.db"
-#	index(sys.argv[1], tmpdb)
-#	s = connectToServer()
-#	senddata(s, tmpdb)
-#	connectioncleanup(s)
+#    tmpdb = "tmp.db"
+#    index(sys.argv[1], tmpdb)
+#    s = connectToServer()
+#    senddata(s, tmpdb)
+#    connectioncleanup(s)
 
 
-	if fail:
-		sys.exit(1)
-	sys.exit(0)
+    if fail:
+        sys.exit(1)
+    sys.exit(0)
 
