@@ -37,6 +37,12 @@ def getmeta(filename):
     mtime = statobj.st_mtime
     return (mode, uid, gid, mtime)
 
+def insertfile(data, dbcsr):
+    dbcsr.execute("insert into files values ( ?, ?, ?, ?, ?, ? )", data)
+
+def insertdir(data, dbcsr):
+    dbcsr.execute("insert into dirs values ( ?, ?, ?, ?, ? )", data)
+
 def index(path, dbconn):
     c = dbconn.cursor()
     for root, dirs, files in os.walk(path):
@@ -45,13 +51,13 @@ def index(path, dbconn):
             print("File:", filename)
             filehash = sha512sum(filename)
             (mode, uid, gid, mtime) = getmeta(filename)
-            c.execute("insert into files values ( ?, ?, ?, ?, ?, ? )", (filehash, filename, mode, uid, gid, mtime))
+            insertfile((filehash, filename, mode, uid, gid, mtime), c)
 
         for name in dirs:
             dirname = root + "/" + name
             print("Dir:", dirname)
             (mode, uid, gid, mtime) = getmeta(dirname)
-            c.execute("insert into dirs values ( ?, ?, ?, ?, ? )", (dirname, mode, uid, gid, mtime))
+            insertdir((dirname, mode, uid, gid, mtime), c)
     dbconn.commit()
     c.close()
     
