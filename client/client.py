@@ -132,11 +132,11 @@ class Backuper(object):
                      {"setid": self.setid, "fileid": fileid, "name": filename, "mode": mode, "uid": uid, "gid": gid, "mtime": mtime})
   
   def insertchunk(self, filename, chunkhash, lastchunk, offset, size):
-    self.csr.execute("insert into chunks (hash) values (:hash)",
-                     {"hash": chunkhash})
+    self.csr.execute("insert into chunks (hash, size) values (:hash, size)",
+                     {"hash": chunkhash, "size": size})
     chunkid = self.csr.lastrowid
-    self.csr.execute("insert into chunkorigin (chunk, name, offset, size) values (:chunk, :name, :offset, :size)",
-                     {"chunk": chunkid, "name": filename, "offset": offset, "size":size})
+    self.csr.execute("insert into chunkorigin (chunk, host, configname, path, offset, size) values (:chunk, :host, :configname, :path, :offset, :size)",
+                     {"chunk": chunkid, "host"self.config["host"]:, "configname":"configname":self.config["name"], "path": filename, "offset": offset, "size":size})
     self.csr.execute("insert into chunkchains (chunk, nextchunk) values (:chunkid, NULL)",
                      {"chunkid": chunkid})
     chainid = self.csr.lastrowid
@@ -157,8 +157,8 @@ class Backuper(object):
     self.csr.execute("create table if not exists files ( hash text, chunkchain integer )")
     self.csr.execute("create table if not exists dirs ( backupset integer, name text, mode integer, uid integer, gid integer, mtime integer )")
     self.csr.execute("create table if not exists links ( backupset integer, name text, dest text, mode integer, uid integer, gid integer, mtime integer )")
-    self.csr.execute("create table if not exists chunks ( hash text )")
-    self.csr.execute("create table if not exists chunkorigin ( chunk integer, name text, offset integer, size integer )")
+    self.csr.execute("create table if not exists chunks ( hash text, size integer )")
+    self.csr.execute("create table if not exists chunkorigin ( chunk integer, host text, configname text, path text, offset integer, size integer )")
     self.csr.execute("create table if not exists chunkchains ( chunk integer, nextchunk integer )")
     self.csr.execute("create table if not exists backupsets ( host text, time datetime default current_timestamp, configname text )")
     self.csr.execute("create table if not exists set2files ( backupset integer, file integer, name text, mode integer, uid integer, gid integer, mtime integer )")
